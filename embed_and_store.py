@@ -28,3 +28,25 @@ index.add(embeddings)
 
 print("Stored", len(chunks), "chunks in FAISS.")
 print("Vector dimension:", dimension)
+def retrieve(query, k=2):
+    # Converting query to embedding
+    query_vector = embedder.encode([query]).astype("float32")
+
+    # Search FAISS
+    distances, indices = index.search(query_vector, k)
+
+    print("\nQuery:", query)
+    print("Distances:", distances)
+    print("Indices:", indices)
+
+    # Return matched chunks
+    return [chunks[i] for i in indices[0]]
+
+# Test retrieval
+query = "What does RAG combine?"
+
+results = retrieve(query)
+
+print("\nTop Retrieved Chunks:")
+for r in results:
+    print("-", r)
