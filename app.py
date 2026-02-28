@@ -1,33 +1,21 @@
 import os
-import requests
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API_KEY").strip()
-
-headers = {
-    "Authorization": f"Bearer {api_key}",
-    "HTTP-Referer": "https://example.com",
-    "X-OpenRouter-Title": "RAGProject",
-    "Content-Type": "application/json",
-}
-
-data = {
-    "model": "upstage/solar-pro-3:free",
-    "messages": [
-        {"role": "user", "content": "Explain RAG simply."}
-    ],
-    "provider": {
-        "allow_fallbacks": True
-    }
-}
-
-response = requests.post(
-    "https://openrouter.ai/api/v1/chat/completions",
-    headers=headers,
-    json=data,
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=os.getenv("HF_API_KEY"),
 )
 
-print("STATUS:", response.status_code)
-print("RESPONSE:", response.text)
+completion = client.chat.completions.create(
+    model="HuggingFaceH4/zephyr-7b-beta:featherless-ai",
+    messages=[
+        {"role": "user", "content": "Explain RAG simply."}
+    ],
+    max_tokens=150,
+    temperature=0.7,
+)
+
+print(completion.choices[0].message.content)
