@@ -1,14 +1,33 @@
-from langchain_openai import ChatOpenAI
 import os
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
-model = ChatOpenAI(
-    model="mistralai/mistral-7b-instruct",
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("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"),   # explicitly pass
+api_key = os.getenv("OPENAI_API_KEY").strip()
+
+headers = {
+    "Authorization": f"Bearer {api_key}",
+    "HTTP-Referer": "https://example.com",
+    "X-OpenRouter-Title": "RAGProject",
+    "Content-Type": "application/json",
+}
+
+data = {
+    "model": "upstage/solar-pro-3:free",
+    "messages": [
+        {"role": "user", "content": "Explain RAG simply."}
+    ],
+    "provider": {
+        "allow_fallbacks": True
+    }
+}
+
+response = requests.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    headers=headers,
+    json=data,
 )
 
-response = model.invoke("Explain RAG in simple terms.")
-print(response.content)
+print("STATUS:", response.status_code)
+print("RESPONSE:", response.text)
