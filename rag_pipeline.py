@@ -50,7 +50,7 @@ def mask_text(text):
     text =re.sub(r'\S+@\S+','[EMAIL_MASKED]',text)
 
     #masking phone number
-    text=re.sub(fr'\b\d{10}\b','[PHONE_MASKED]',text)
+    text=re.sub(r'\b\d{10}\b','[PHONE_MASKED]',text)
     return text 
 
 
