@@ -1,4 +1,5 @@
 import os
+import re
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -43,6 +44,14 @@ client = OpenAI(
     base_url="https://router.huggingface.co/v1",
     api_key=os.environ["HF_API_KEY"]
 )
+#masking function
+def mask_text(text):
+    #masking email
+    text =re.sub(r'\S+@\S+','[EMAIL_MASKED]',text)
+
+    #masking phone number
+    text=re.sub(fr'\b\d{10}\b','[PHONE_MASKED]',text)
+    return text 
 
 
 # Retrieval function
