@@ -109,11 +109,19 @@ def rag_answer(query):
 
 
 
-# Test Query
+# CLI chat
+if __name__ == "__main__":
 
-question="my email is atharva@gmail.com how do llm calls work?"
+    print("\n CLI RAG chat \n")
 
-answer = rag_answer(question)
+    while True:
+        user_input = input("query: ")
 
-print("Final Answer:\n")
-print(answer)
+        if user_input.lower() in ["exit", "quit"]:
+            print("\nExiting CLI chat...\n")
+            break
+
+        response = rag_answer(user_input)
+
+        print("\LLM:", response)
+        print("\n" + "-"*50 + "\n")
