@@ -13,15 +13,20 @@ client = OpenAI(
 #llm build prompt
 def generate_answer(context, query):
     messages = [
-        {
-            "role": "system",
-            "content": "Answer ONLY using provided context. If not found, say you don't know."
-        },
-        {
-            "role": "user",
-            "content": f"Context:\n{context}\n\nQuestion:\n{query}"
-        }
-    ]
+    {
+        "role": "system",
+        "content": (
+            "You are a strict RAG assistant.\n"
+            "Answer ONLY using the provided context.\n"
+            "If the answer is not explicitly present, reply exactly with: I don't know.\n"
+            "Do not explain anything extra.\n"
+        )
+    },
+    {
+        "role": "user",
+        "content": f"Context:\n{context}\n\nQuestion:\n{query}"
+    }
+]
 #completion model used
     completion = client.chat.completions.create(
         model="HuggingFaceH4/zephyr-7b-beta:featherless-ai",
