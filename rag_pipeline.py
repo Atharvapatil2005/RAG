@@ -5,58 +5,57 @@ from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# -----------------------
+
 # Load environment
-# -----------------------
+
 load_dotenv()
 
-# -----------------------
+
 # Load embedding model
-# -----------------------
+
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# -----------------------
+
 # Load document
-# -----------------------
+
 with open("data.txt", "r") as f:
     text = f.read()
 
 chunks = [line for line in text.split("\n") if line.strip() != ""]
 
-# -----------------------
+
 # Create embeddings
-# -----------------------
+
 embeddings = embedder.encode(chunks)
 embeddings = np.array(embeddings).astype("float32")
 
-# -----------------------
+
 # Create FAISS index
-# -----------------------
+
 dimension = embeddings.shape[1]
 index = faiss.IndexFlatL2(dimension)
 index.add(embeddings)
 
-# -----------------------
+
 # Setup Zephyr (HF Router)
-# -----------------------
+
 client = OpenAI(
     base_url="https://router.huggingface.co/v1",
-    api_key="HF_API_KEY"
+    api_key=os.environ["HF_API_KEY"]
 )
 
-# -----------------------
+
 # Retrieval function
-# -----------------------
+
 def retrieve(query, k=2):
     query_vector = embedder.encode([query]).astype("float32")
     distances, indices = index.search(query_vector, k)
     return [chunks[i] for i in indices[0]]
 
-# -----------------------
-# Full RAG Function
-# -----------------------
+# RAG Function
+
 def rag_answer(query):
-    # 1️⃣ Retrieve context
+    #  Retrieve context
     context_chunks = retrieve(query)
     context = "\n".join(context_chunks) 
 
@@ -64,7 +63,7 @@ def rag_answer(query):
     print(context)
     print("\n---\n")
 
-    # 2️⃣ Build prompt
+    # Build prompt
     messages = [
         {
             "role": "system",
@@ -76,7 +75,7 @@ def rag_answer(query):
         }
     ]
 
-    # 3️⃣ Call LLM
+    #Call LLM
     completion = client.chat.completions.create(
         model="HuggingFaceH4/zephyr-7b-beta:featherless-ai",
         messages=messages,
@@ -87,10 +86,10 @@ def rag_answer(query):
     return completion.choices[0].message.content
 
 
-# -----------------------
+
 # Test Query
-# -----------------------
-question = "What does RAG combine?"
+
+question = "how do llm calls work?"
 
 answer = rag_answer(question)
 
