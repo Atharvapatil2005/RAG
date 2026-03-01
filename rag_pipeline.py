@@ -64,9 +64,15 @@ def retrieve(query, k=2):
 # RAG Function
 
 def rag_answer(query):
-    #  Retrieve context
-    context_chunks = retrieve(query)
+    #masking user query
+    masked_query=mask_text(query)
+
+    #retrieving using masked query
+    context_chunks = retrieve(masked_query)
     context = "\n".join(context_chunks) 
+
+    #masking retrieved context
+    context=mask_text(context)
 
     print("\nRetrieved Context:\n")
     print(context)
@@ -80,7 +86,7 @@ def rag_answer(query):
         },
         {
             "role": "user",
-            "content": f"Context:\n{context}\n\nQuestion:\n{query}"
+            "content": f"Context:\n{context}\n\nQuestion:\n{masked_query}"
         }
     ]
 
