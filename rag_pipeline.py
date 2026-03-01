@@ -66,6 +66,13 @@ def retrieve(query, k=2):
 def rag_answer(query):
     #masking user query
     masked_query=mask_text(query)
+    #logging origial query
+    print("\n[LOG] original query:")
+    print(query)
+
+    #logging masked query
+    print("\n[LOG] masked query:")
+    print(masked_query)
 
     #retrieving using masked query
     context_chunks = retrieve(masked_query)
@@ -104,7 +111,7 @@ def rag_answer(query):
 
 # Test Query
 
-question = "how do llm calls work?"
+question="my email is atharva@gmail.com how do llm calls work?"
 
 answer = rag_answer(question)
 
