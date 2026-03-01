@@ -1,7 +1,5 @@
 import faiss
 import numpy as np
-import faiss
-import numpy as np
 
 class VectorStore:
     def __init__(self, embeddings):
