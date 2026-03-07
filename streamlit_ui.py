@@ -14,9 +14,13 @@ if query:
     placeholder=st.empty()
     full_text=""
 
-
-    for chunk in response.iter_content(chunk_size=1):
-        if chunk:
-            token=chunk.decode("utf-8")
-            full_text += token
-            placeholder.markdown(full_text)
+    try:
+        for chunk in response.iter_content(chunk_size=1):
+            if chunk:
+                token=chunk.decode("utf-8")
+                full_text += token
+                placeholder.markdown(full_text)
+    except requests.exceptions.ChunkedEncodingError:
+        pass
+    
+    
