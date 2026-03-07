@@ -3,21 +3,20 @@ import requests
 
 st.title("RAG Chat")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-user_input = st.text_input("Ask something:")
-
-if user_input:
-    response = requests.post(
+query=st.text_input("Ask something: ")
+#the ui now does not expect json 
+if query:
+    response=requests.post(
         "http://localhost:8000/chat",
-        json={"question": user_input}
+        json={"question":query},
+        stream = True
     )
+    placeholder=st.empty()
+    full_text=""
 
-    answer = response.json()["answer"]
 
-    st.session_state.messages.append(("You", user_input))
-    st.session_state.messages.append(("LLM", answer))
-
-for role, msg in st.session_state.messages:
-    st.write(f"**{role}:** {msg}")
+    for chunk in response.iter_content(chunk_size=1):
+        if chunk:
+            token=chunk.decode("utf-8")
+            full_text += token
+            placeholder.markdown(full_text)
