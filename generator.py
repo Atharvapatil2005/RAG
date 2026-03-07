@@ -36,4 +36,8 @@ def generate_answer(context, query):
         stream=True         #enable streaming
     )
 
-    return completion.choices[0].message.content
+
+    # Stream tokens back
+    for chunk in completion:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
