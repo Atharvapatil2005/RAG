@@ -10,7 +10,7 @@ client = OpenAI(
     base_url="https://router.huggingface.co/v1",
     api_key=os.environ["HF_API_KEY"]
 )
-#llm build prompt
+#llm build prompt + steaming reaponse
 def generate_answer(context, query):
     messages = [
     {
@@ -33,6 +33,7 @@ def generate_answer(context, query):
         messages=messages,
         max_tokens=200,
         temperature=0.3,
+        stream=True         #enable streaming
     )
 
     return completion.choices[0].message.content
