@@ -1,0 +1,43 @@
+# Example MEDICAL domain policy (configuration only, no code changes).
+#
+# Demonstrates the generic policy engine configured for clinical notes:
+# patient identity is masked while clinically relevant vocabulary
+# (medications, dosages, diagnoses, treatments, follow-up terminology)
+# is preserved so retrieval keeps medical meaning.
+version: 1
+name: medical
+description: >
+  Clinical policy: mask patient identifiers, preserve clinical
+  terminology so diagnosis/medication context stays retrievable.
+
+entities:
+  # Explicit decisions per detector label. Unlisted labels are still
+  # masked by the engine's safe default; these document intent.
+  PERSON: mask        # patient / clinician names
+  ORG: mask           # hospitals, labs (unless a preserved term matches)
+  GPE: mask           # cities / regions
+  LOC: mask
+  FAC: mask           # facility names
+  EMAIL: mask
+  PHONE: mask
+  AADHAAR: mask
+  PAN: mask
+  HEALTH_ID: mask
+  PATIENT_ID: mask    # MRN / UHID style identifiers
+  DOB: mask
+
+preserve:
+  categories:
+    - medication      # reserved for future detector integration
+    - dosage
+    - diagnosis
+    - treatment
+    - follow_up
+
+  terms:
+    - Amlodipine
+    - Metformin
+    - Paracetamol
+    - Hypertension
+    - Diabetes
+    - Dengue Fever

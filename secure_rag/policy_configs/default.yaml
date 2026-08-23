@@ -1,0 +1,10 @@
+# Default policy: privacy-first baseline.
+#
+# Every detected entity is MASKED. This reproduces the historical
+# DefaultPolicy behavior: unlisted labels are masked too, because
+# "unknown/ambiguous -> MASK" is the engine's built-in safe default.
+version: 1
+name: default
+description: >
+  Masks all detected identifiers (names, organizations, locations,
+  contact details, government IDs). No vocabulary is preserved.

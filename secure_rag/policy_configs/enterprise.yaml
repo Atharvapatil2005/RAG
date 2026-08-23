@@ -1,0 +1,29 @@
+# Example ENTERPRISE domain policy (second proof of reusability).
+#
+# Same generic engine as medical.yaml, different configuration only.
+# Employee/customer identifiers are masked while internal product,
+# project, department and technology names stay readable.
+version: 1
+name: enterprise
+description: >
+  Enterprise policy: mask personal and contact identifiers, preserve
+  internal project/product/department/technology terminology.
+
+entities:
+  PERSON: mask        # employees, customers
+  ORG: mask           # external companies (unless a preserved term matches)
+  EMAIL: mask
+  PHONE: mask
+
+preserve:
+  categories:
+    - project         # reserved for future detector integration
+    - product
+    - department
+    - technology
+
+  terms:
+    - Project Atlas
+    - Helios Platform
+    - People Operations
+    - Kubernetes
