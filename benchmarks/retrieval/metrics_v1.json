@@ -3,7 +3,7 @@
   "metrics_framework_version": "1",
   "source_artifact": "retrieval_results_v1.json",
   "source_runner_version": "3",
-  "generated_at": "2026-07-09T07:45:06.198944Z",
+  "generated_at": "2026-09-01T13:09:57.701809Z",
   "description": "Canonical IR metrics for Secure RAG retrieval evaluation. Metrics are computed from the self-contained retrieval artifact. No retrieval, embedding, or LLM calls were performed.",
   "k_values": [
     1,
