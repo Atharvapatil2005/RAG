@@ -28,9 +28,11 @@ sys.path.insert(0, str(PROJECT_DIR))
 
 import numpy as np
 
+from secure_rag.detection import load_detector_stack
 from secure_rag.masker import mask_text
 from secure_rag.pdf_loader import chunk_text
 from secure_rag.embedding import embed_chunks
+from secure_rag.policies import load_policy
 from secure_rag.vector_store import VectorStore
 
 sys.path.insert(0, str(BENCHMARK_DIR))
@@ -47,12 +49,15 @@ RETRIEVAL_RESULTS_PATH = RETRIEVAL_DIR / f"retrieval_results_{RETRIEVAL_RESULTS_
 def _build_index_with_record_map(
     records: Dict[str, dict], use_masking: bool
 ) -> Tuple[VectorStore, List[str], List[str]]:
+    if use_masking:
+        medical_policy = load_policy("medical")
+        medical_detectors = load_detector_stack("medical")
     texts_with_ids = []
     for rid in sorted(records.keys()):
         r = records[rid]
         text = r["text"]
         if use_masking:
-            text = mask_text(text)
+            text = mask_text(text, policy=medical_policy, detectors=medical_detectors)
         texts_with_ids.append((rid, text))
 
     chunks = []
