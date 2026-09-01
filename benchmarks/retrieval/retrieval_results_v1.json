@@ -1,14 +1,14 @@
 {
   "version": "v1",
   "runner_version": "3",
-  "generated_at": "2026-07-09T07:43:35.125374Z",
+  "generated_at": "2026-09-01T13:09:50.305350Z",
   "description": "Self-contained canonical retrieval artifact for Secure RAG retrieval evaluation. Each query includes all ground truth metadata (category, subcategory, expected_behaviour). Each retrieved item includes a relevance flag. Consumed by downstream phases: IR metrics, failure analysis, reporting.",
   "configs": {
     "baseline_a": {
       "index_type": "raw",
       "num_chunks": 20,
       "num_records": 20,
-      "build_time_s": 6.932,
+      "build_time_s": 9.663,
       "chunks_per_record": {
         "MED001": 1,
         "MED014": 1,
@@ -36,7 +36,7 @@
       "index_type": "raw",
       "num_chunks": 20,
       "num_records": 20,
-      "build_time_s": 0.065,
+      "build_time_s": 0.072,
       "chunks_per_record": {
         "MED001": 1,
         "MED014": 1,
@@ -64,7 +64,7 @@
       "index_type": "masked",
       "num_chunks": 20,
       "num_records": 20,
-      "build_time_s": 1.221,
+      "build_time_s": 1.361,
       "chunks_per_record": {
         "MED001": 1,
         "MED014": 1,
