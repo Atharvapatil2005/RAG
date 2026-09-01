@@ -519,6 +519,185 @@ Each patient gets 1-3 diagnoses. Secondaries are sampled without replacement,
 biased 3:1 toward the primary disease's documented comorbidities, so records
 like Diabetes + Hypertension or COPD + Pneumonia appear naturally.
 
+---
+
+## Retrieval Diagnostic Audit — Medication Lookup Failure
+
+### Query Investigated
+
+```
+Which patients were prescribed Amlodipine 5mg?
+```
+
+### Summary
+
+The answer disappears at the masking stage. The generated dataset contains
+`Amlodipine 5mg`, and chunking preserves it intact. However, `mask_text()` uses
+spaCy NER after regex masking, and spaCy misclassifies medication terms such as
+`Amlodipine` as named entities. The medication is replaced with placeholders
+before embedding and indexing, so vector search never sees the literal
+medication requested by the query.
+
+This was an investigation only. No runtime code, prompts, retrieval settings,
+embeddings, or chunking were modified.
+
+### Pipeline Observed
+
+Current runtime path:
+
+```
+load_data()
+  -> split_into_records()
+  -> mask_text()
+  -> chunk_record()
+  -> embed_chunks()
+  -> VectorStore
+  -> retrieve()
+  -> generate_answer()
+```
+
+The relevant code path is in `secure_rag/rag_pipeline.py`: `build_rag()` masks
+each record before chunking and embedding.
+
+### Stage Results
+
+| Stage | Result | Finding |
+| --- | --- | --- |
+| Dataset | PASS | `data/sample_patient_data.txt` contains 17 `Amlodipine` occurrences in 17 records. |
+| Chunking | PASS | Each matching patient remains one chunk; `Amlodipine 5mg` is intact before masking. |
+| Masking | FAIL | Every relevant chunk loses both `Amlodipine` and `5mg`. |
+| Embedding | FAIL downstream | Embeddings are built from masked chunks that no longer contain the queried medication. |
+| Vector Search / Ranking | FAIL downstream | Top-10 chunks contain no literal `Amlodipine` and no `5mg`. |
+| Retrieved Context | FAIL | Runtime Top-2 context does not contain the answer. |
+| Prompt Construction | PASS / not bottleneck | The final prompt faithfully includes retrieved context, but the context lacks the medication. |
+| LLM Generation | PASS / not implicated | Returning `I don't know` is consistent with the context supplied to the model. |
+
+### Root Cause
+
+Selected root cause:
+
+```
+Masking
+```
+
+Specifically, spaCy NER inside `mask_text()` masks medication names and nearby
+numeric dosage text. Examples observed:
+
+```
+Treatment: Amlodipine 5mg, Lifestyle modification.
+```
+
+became:
+
+```
+Treatment: [NAME_MASKED]mg, [NAME_MASKED] modification.
+```
+
+and in some records:
+
+```
+Treatment: Low-salt diet, Renal function monitoring, Amlodipine 5mg.
+```
+
+became:
+
+```
+Treatment: Low-salt diet, [ORG_MASKED] function monitoring, [NAME_MASKED]Notes:
+```
+
+The medication is therefore lost before embeddings and FAISS search.
+
+### Dataset Evidence
+
+The dataset contains 17 expected relevant records:
+
+```
+MRN1001  Nakul Rattan        Hypertension; Asthma; Migraine                  Amlodipine 5mg
+MRN1005  Ekiya Koshy         Hyperlipidemia; Hypertension                    Amlodipine 5mg
+MRN1021  Jagdish Bhardwaj    Hypertension                                    Amlodipine 5mg
+MRN1025  Libni Wable         Hypertension; Anxiety Disorder                  Amlodipine 5mg
+MRN1026  Jagvi Zacharia      Hypertension; Fibromyalgia                      Amlodipine 5mg
+MRN1052  Robert Lanka        Hypertension; GERD                              Amlodipine 5mg
+MRN1054  Faras Gupta         Chronic Kidney Disease                          Amlodipine 5mg
+MRN1059  Girik Biswas        Hypertension; Hyperlipidemia                    Amlodipine 5mg
+MRN1066  Nisha Bora          Hypertension                                    Amlodipine 5mg
+MRN1070  Krisha Pingle       Hypertension; Viral Fever; Psoriasis            Amlodipine 5mg
+MRN1074  Dalbir Chhabra      Hypertension; Hyperlipidemia                    Amlodipine 5mg
+MRN1085  Ansh Morar          Hypertension; COPD; Sinusitis                   Amlodipine 5mg
+MRN1092  Gauri Chokshi       Chronic Kidney Disease                          Amlodipine 5mg
+MRN1107  Oni Murthy          Hypertension                                    Amlodipine 5mg
+MRN1111  Shivansh Raghavan   Hypertension                                    Amlodipine 5mg
+MRN1118  Chakradhar Keer     Hypertension; Urinary Tract Infection           Amlodipine 5mg
+MRN1119  Jeevika Issac       Hypertension                                    Amlodipine 5mg
+```
+
+### Retrieval Evidence
+
+FAISS uses L2 distance, so lower is better. Top-10 retrieval for the exact query:
+
+```
+1.  distance=1.175774 | MRN1060 | Epilepsy; Influenza | Amlodipine=NO | 5mg=NO
+2.  distance=1.186596 | MRN1111 | Hypertension | Amlodipine=NO | 5mg=NO
+3.  distance=1.209115 | MRN1022 | GERD; Epilepsy; Sciatica | Amlodipine=NO | 5mg=NO
+4.  distance=1.214506 | MRN1066 | Hypertension | Amlodipine=NO | 5mg=NO
+5.  distance=1.231099 | MRN1094 | Chronic Kidney Disease; Rheumatoid Arthritis | Amlodipine=NO | 5mg=NO
+6.  distance=1.233959 | MRN1059 | Hypertension; Hyperlipidemia | Amlodipine=NO | 5mg=NO
+7.  distance=1.250587 | MRN1053 | Migraine | Amlodipine=NO | 5mg=NO
+8.  distance=1.252337 | MRN1119 | Hypertension | Amlodipine=NO | 5mg=NO
+9.  distance=1.259530 | MRN1025 | Hypertension; Anxiety Disorder | Amlodipine=NO | 5mg=NO
+10. distance=1.259937 | MRN1039 | Migraine; Anxiety Disorder | Amlodipine=NO | 5mg=NO
+```
+
+Some expected records are technically ranked in the Top-10, but their retrieved
+chunks no longer contain the medication because masking removed it. They cannot
+answer the query.
+
+### Ground Truth Ranking
+
+```
+MRN1001  NOT FOUND  rank=21  distance=1.323069
+MRN1005  NOT FOUND  rank=59  distance=1.424293
+MRN1021  NOT FOUND  rank=22  distance=1.324677
+MRN1025  FOUND      rank=9   distance=1.259530
+MRN1026  NOT FOUND  rank=11  distance=1.274723
+MRN1052  NOT FOUND  rank=19  distance=1.314864
+MRN1054  NOT FOUND  rank=33  distance=1.359998
+MRN1059  FOUND      rank=6   distance=1.233959
+MRN1066  FOUND      rank=4   distance=1.214506
+MRN1070  NOT FOUND  rank=13  distance=1.279102
+MRN1074  NOT FOUND  rank=51  distance=1.400741
+MRN1085  NOT FOUND  rank=25  distance=1.340046
+MRN1092  NOT FOUND  rank=50  distance=1.399263
+MRN1107  NOT FOUND  rank=12  distance=1.278247
+MRN1111  FOUND      rank=2   distance=1.186596
+MRN1118  NOT FOUND  rank=42  distance=1.385151
+MRN1119  FOUND      rank=8   distance=1.252337
+```
+
+Again, `FOUND` here only means the patient record was ranked in Top-10. It does
+not mean the retrieved masked chunk still contains `Amlodipine 5mg`.
+
+### Runtime Top-2 Context
+
+`secure_rag/retriever.py` defaults to `k=2`. For the investigated query, runtime
+Top-2 context contained:
+
+```
+MRN1060 masked chunk: no Amlodipine, no 5mg
+MRN1111 masked chunk: no Amlodipine, no 5mg
+```
+
+The final prompt therefore lacked the answer. The model returning `I don't know`
+is expected behavior under the prompt's grounding rules.
+
+### Key Learning
+
+Medication-specific retrieval fails because the privacy masking layer currently
+removes non-PHI clinical terms before indexing. This is distinct from a prompt
+issue or an LLM generation issue. Before changing retrieval architecture, the
+masking behavior must be understood as the precise bottleneck for medication
+lookup failures.
+
 ### Design Decision: Schema-Compatible Additive Extension
 
 The record format keeps the pipeline's ingestion contract (blank-line separated
@@ -556,4 +735,3 @@ out of scope and should be addressed in later phases.
 
 Not affected. The evaluation framework consumes `benchmarks/dataset.jsonl`
 (untouched this phase), not `data/sample_patient_data.txt`.
-
