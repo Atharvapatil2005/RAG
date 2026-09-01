@@ -60,6 +60,9 @@ class ConfigurablePolicy(MaskingPolicy):
             for pattern in self._term_patterns:
                 if pattern.search(text_norm):
                     return False  # explicitly preserved by configuration
+        label_norm = _normalize(entity_label)
+        if label_norm and label_norm in self.preserved_categories:
+            return False  # preserved category wins for domain-aware detectors
         decision = self.entity_decisions.get(str(entity_label).upper())
         if decision == DECISION_KEEP:
             return False  # explicitly kept by configuration

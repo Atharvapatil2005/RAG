@@ -121,6 +121,11 @@ class TestDecisionLogic:
         assert policy.should_mask("PRODUCT", "amlodipine") is False
         assert policy.should_mask("PRODUCT", "Dengue  fever") is False
 
+    def test_preserved_categories_keep_domain_labels(self):
+        policy = load_policy("medical")
+        assert policy.should_mask("MEDICATION", "Amlodipine") is False
+        assert policy.should_mask("DOSAGE", "5mg") is False
+
 
 class TestDomainNeutrality:
     @pytest.mark.parametrize("source", ENGINE_SOURCES)

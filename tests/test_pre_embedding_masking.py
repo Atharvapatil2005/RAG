@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from secure_rag import build_rag
@@ -31,8 +32,16 @@ class TestPreEmbeddingMasking:
 
         os.environ.setdefault("HF_TOKEN", "dummy-for-test")
         os.environ.setdefault("SPACY_MODEL", "en_core_web_sm")
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(
+            "secure_rag.rag_pipeline.embed_chunks",
+            lambda chunks: np.zeros((len(chunks), 4), dtype="float32"),
+        )
 
-        vector_store, chunks = build_rag(str(FIXTURE_PATH))
+        try:
+            vector_store, chunks = build_rag(str(FIXTURE_PATH))
+        finally:
+            monkeypatch.undo()
 
         all_text = " ".join(chunks)
         for pattern in PII_PATTERNS:
@@ -44,8 +53,16 @@ class TestPreEmbeddingMasking:
 
         os.environ.setdefault("HF_TOKEN", "dummy-for-test")
         os.environ.setdefault("SPACY_MODEL", "en_core_web_sm")
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(
+            "secure_rag.rag_pipeline.embed_chunks",
+            lambda chunks: np.zeros((len(chunks), 4), dtype="float32"),
+        )
 
-        vector_store, chunks = build_rag(str(FIXTURE_PATH))
+        try:
+            vector_store, chunks = build_rag(str(FIXTURE_PATH))
+        finally:
+            monkeypatch.undo()
 
         all_text = " ".join(chunks)
         expected_tokens = [
@@ -59,6 +76,24 @@ class TestPreEmbeddingMasking:
         ]
         for token in expected_tokens:
             assert token in all_text, f"Missing masked token: '{token}'"
+
+    def test_medical_terms_survive_pre_embedding_masking(self, tmp_path, monkeypatch):
+        file_path = tmp_path / "medical_note.txt"
+        file_path.write_text(
+            "Patient was prescribed Amlodipine 5mg for Hypertension.",
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(
+            "secure_rag.rag_pipeline.embed_chunks",
+            lambda chunks: np.zeros((len(chunks), 4), dtype="float32"),
+        )
+
+        _, chunks = build_rag(str(file_path))
+
+        all_text = " ".join(chunks)
+        assert "Amlodipine 5mg" in all_text
+        assert "Hypertension" in all_text
 
     def test_empty_file_raises(self):
         tmp = Path("/tmp/empty_test_rag.txt")

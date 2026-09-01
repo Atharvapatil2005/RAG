@@ -65,6 +65,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "secure_rag.policy_configs" = ["*.yaml"]
+"secure_rag.domain_configs" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 markers = [

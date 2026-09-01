@@ -1,0 +1,29 @@
+version: 1
+name: medical
+description: >
+  Config-driven medical domain detector for reusable pre-embedding
+  privacy enforcement.
+
+terms:
+  MEDICATION:
+    - Amlodipine
+    - Metformin
+    - Paracetamol
+    - Insulin
+  DIAGNOSIS:
+    - Hypertension
+    - Type 2 Diabetes
+    - Dengue Fever
+    - Chronic Kidney Disease
+  TREATMENT:
+    - Lifestyle modification
+    - Diet control
+    - Physical therapy
+  FOLLOW_UP:
+    - Follow up
+    - Review visit
+    - Review in 2 weeks
+
+patterns:
+  DOSAGE:
+    - '\b\d+(?:\.\d+)?\s?(?:mg|mcg|g|ml|units?)\b'

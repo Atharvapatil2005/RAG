@@ -2,10 +2,12 @@ import logging#for debugging and tracking
 import re
 from pathlib import Path #connects all modules
 #imports
+from .detection import load_detector_stack
 from .embedding import embed_chunks
 from .generator import generate_answer
 from .masker import mask_text
 from .pdf_loader import chunk_record, load_pdf, split_into_records
+from .policies import load_policy
 from .retriever import retrieve
 from .vector_store import VectorStore
 
@@ -61,13 +63,16 @@ def load_data(file_path):#fn load data
     )
 
 
-def build_rag(file_path):
+def build_rag(file_path, policy=None, detector_profile="medical"):
     text = load_data(file_path)
     records = split_into_records(text)#Instead of treating the full document as one flat string, it splits it on blank lines, so each patient record becomes its own unit.
     chunks = []#building chunks record by record
+    if policy is None:
+        policy = load_policy("medical")
+    detectors = load_detector_stack(detector_profile)
 
     for record in records:
-        record = mask_text(record)#masks each record before chunking
+        record = mask_text(record, policy=policy, detectors=detectors)#masks each record before chunking
         #data flow : load_data() → split_into_records() → mask_text() → chunk_record() → embed_chunks() → VectorStore
         chunks.extend(chunk_record(record))
 
