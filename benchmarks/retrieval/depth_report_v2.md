@@ -81,3 +81,11 @@ Ranked by retrieval quality, precision, latency, context size, complexity, resea
 5. E. reranking layer (future)
 
 Rationale: Multi-record queries need k≈20-50 for full coverage; single-record queries saturate by k=10 and do not benefit from large k (precision collapse). Fixed large k penalizes single-record latency/context. Adaptive mode preserves single-record efficiency while enabling candidate pool for aggregates.
+k=2 is insufficient for multi-record queries.
+k=20 gives ~98% mean multi-record recall.
+k=30 gives ~99%.
+k=50 reaches 100% aggregate recall.
+Precision decreases as k increases.
+Single-record queries don't benefit much from large k.
+Secure-RAG and baseline retrieval are very close, so masking isn't the cause of the multi-record retrieval problem.
+Dense retrieval does capture the relevant semantics; the main issue is candidate depth.
