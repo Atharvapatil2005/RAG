@@ -1,28 +1,3 @@
-"""
-IR Metrics — Secure RAG retrieval evaluation.
-
-Computes standard Information Retrieval metrics from the canonical
-retrieval artifact. No retrieval occurs during this phase.
-
-Metrics:
-- Hit Rate@k: proportion of queries where ground truth record in top-k
-- Precision@k: proportion of relevant chunks in top-k
-- Recall@k: proportion of relevant chunks retrieved out of total
-- MRR@k: mean reciprocal rank of first relevant result
-
-Aggregation levels:
-- Overall (per config, per k)
-- Per query category (general / phi_targeting)
-- Per query subcategory (factual_hospital, summary, phi_aadhaar, ...)
-
-Consumes:
-  retrieval_results_v1.json  (from runner.py)
-  ground_truth_v1.json       (for category hierarchy validation)
-
-Produces:
-  metrics_v1.json            (canonical metrics artifact)
-"""
-
 import json
 import math
 import sys
@@ -34,45 +9,94 @@ RETRIEVAL_DIR = Path(__file__).parent
 BENCHMARK_DIR = RETRIEVAL_DIR.parent
 sys.path.insert(0, str(BENCHMARK_DIR))
 METRICS_VERSION = "v1"
+METRICS_VERSION_V2 = "v2"
 METRICS_FRAMEWORK_VERSION = "1"
+METRICS_FRAMEWORK_VERSION_V2 = "2"
 METRICS_PATH = RETRIEVAL_DIR / f"metrics_{METRICS_VERSION}.json"
+METRICS_PATH_V2 = RETRIEVAL_DIR / f"metrics_{METRICS_VERSION_V2}.json"
 
 K_VALUES = [1, 3, 5, 10]
+K_VALUES_V1 = [1, 3, 5, 10]
+K_VALUES_V2 = [1, 3, 5, 10, 20, 30, 50]
 METRIC_NAMES = ["hit_rate", "precision", "recall", "mrr"]
 
 
-def hit_rate_at_k(retrieved: list, k: int) -> int:
-    return 1 if any(item["relevant"] for item in retrieved[:k]) else 0
+def hit_rate_at_k(retrieved: list, k: int, relevant_set=None) -> int:
+    if relevant_set is not None:
+        if len(relevant_set) == 0:
+            return 0
+        for item in retrieved[:k]:
+            if item.get("record_id") in relevant_set:
+                return 1
+        return 0
+    return 1 if any(item.get("relevant") for item in retrieved[:k]) else 0
 
 
-def precision_at_k(retrieved: list, k: int) -> float:
-    relevant = sum(1 for item in retrieved[:k] if item["relevant"])
+def precision_at_k(retrieved: list, k: int, relevant_set=None) -> float:
+    if k <= 0:
+        return 0.0
+    if relevant_set is not None:
+        if len(relevant_set) == 0:
+            return 0.0
+        eff_k = min(k, len(retrieved)) if retrieved else k
+        if eff_k == 0:
+            return 0.0
+        denom = k if len(retrieved) >= k else eff_k
+        seen = set()
+        count = 0
+        for item in retrieved[:k]:
+            rid = item.get("record_id")
+            if rid in relevant_set and rid not in seen:
+                seen.add(rid)
+                count += 1
+        return count / denom
+    relevant = sum(1 for item in retrieved[:k] if item.get("relevant"))
     return relevant / k
 
 
-def recall_at_k(retrieved: list, k: int, total_relevant: int) -> float:
+def recall_at_k(retrieved: list, k: int, total_relevant: int = None, relevant_set=None) -> float:
+    if relevant_set is not None:
+        if len(relevant_set) == 0:
+            return 0.0
+        seen = set()
+        for item in retrieved[:k]:
+            rid = item.get("record_id")
+            if rid in relevant_set:
+                seen.add(rid)
+        return len(seen) / len(relevant_set)
+    if total_relevant is None:
+        total_relevant = 0
     if total_relevant == 0:
         return 0.0
-    relevant = sum(1 for item in retrieved[:k] if item["relevant"])
+    relevant = sum(1 for item in retrieved[:k] if item.get("relevant"))
     return relevant / total_relevant
 
 
-def mrr_at_k(retrieved: list, k: int) -> float:
+def mrr_at_k(retrieved: list, k: int, relevant_set=None) -> float:
+    if relevant_set is not None:
+        if len(relevant_set) == 0:
+            return 0.0
+        seen = set()
+        for i, item in enumerate(retrieved[:k]):
+            rid = item.get("record_id")
+            if rid in seen:
+                continue
+            seen.add(rid)
+            if rid in relevant_set:
+                return 1.0 / (i + 1)
+        return 0.0
     for i, item in enumerate(retrieved[:k]):
-        if item["relevant"]:
+        if item.get("relevant"):
             return 1.0 / (i + 1)
     return 0.0
 
 
 def compute_per_query_metrics(
     retrieval_results: dict,
-) -> Tuple[dict, dict]:
+) -> Tuple[dict, dict, list]:
     queries = retrieval_results["queries"]
     config_ids = list(retrieval_results["configs"].keys())
     k_values = retrieval_results["k_values"]
-    cpr_cache = {}
-    for cid in config_ids:
-        cpr_cache[cid] = retrieval_results["configs"][cid].get("chunks_per_record", {})
 
     per_query = {}
     for q_entry in queries:
@@ -80,27 +104,27 @@ def compute_per_query_metrics(
         category = q_entry.get("category", "unknown")
         subcategory = q_entry.get("subcategory", "unknown")
         gt_records = q_entry.get("ground_truth_records", [])
+        gt_set = set(gt_records)
 
         q_metrics = {
             "category": category,
             "subcategory": subcategory,
             "ground_truth_records": gt_records,
+            "num_relevant": len(gt_set),
         }
 
         for cid in config_ids:
             retrieved = q_entry["results"][cid].get("retrieved", [])
 
-            total_relevant = 0
-            for rec_id in gt_records:
-                total_relevant += cpr_cache[cid].get(rec_id, 1)
-
             c_metrics = {}
             for k in k_values:
                 c_metrics[f"k_{k}"] = {
-                    "hit_rate": hit_rate_at_k(retrieved, k),
-                    "precision": precision_at_k(retrieved, k),
-                    "recall": recall_at_k(retrieved, k, total_relevant),
-                    "mrr": mrr_at_k(retrieved, k),
+                    "hit_rate": hit_rate_at_k(retrieved, k, gt_set),
+                    "precision": precision_at_k(retrieved, k, gt_set),
+                    "recall": recall_at_k(retrieved, k, relevant_set=gt_set),
+                    "mrr": mrr_at_k(retrieved, k, gt_set),
+                    "relevant_retrieved": len(set(item["record_id"] for item in retrieved[:k] if item["record_id"] in gt_set)),
+                    "total_relevant": len(gt_set),
                 }
             q_metrics[cid] = c_metrics
 
@@ -207,7 +231,7 @@ def compute_comparisons(
     return comparisons
 
 
-def compute_metrics(retrieval_results: dict = None) -> dict:
+def compute_metrics(retrieval_results: dict = None, version: str = None) -> dict:
     if retrieval_results is None:
         retrieval_results = _load_retrieval_results()
 
@@ -217,24 +241,36 @@ def compute_metrics(retrieval_results: dict = None) -> dict:
 
     comparisons = compute_comparisons(aggregated, config_ids, k_values)
 
+    inferred_version = retrieval_results.get("version", METRICS_VERSION)
+    if version is None:
+        version = inferred_version if inferred_version in (METRICS_VERSION, METRICS_VERSION_V2) else METRICS_VERSION
+    framework_version = METRICS_FRAMEWORK_VERSION_V2 if version == METRICS_VERSION_V2 else METRICS_FRAMEWORK_VERSION
+    source_artifact = f"retrieval_results_{version}.json"
+
     metrics = {
-        "version": METRICS_VERSION,
-        "metrics_framework_version": METRICS_FRAMEWORK_VERSION,
-        "source_artifact": "retrieval_results_v1.json",
+        "version": version,
+        "metrics_framework_version": framework_version,
+        "source_artifact": source_artifact,
         "source_runner_version": retrieval_results.get("runner_version", "unknown"),
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "description": (
             "Canonical IR metrics for Secure RAG retrieval evaluation. "
             "Metrics are computed from the self-contained retrieval artifact. "
+            "Record-level set-based evaluation: relevant_records is a set of record IDs. "
+            "Precision = |retrieved_records ∩ relevant| / k (unique records, K capped at index size if K > n). "
+            "Recall = |retrieved_records ∩ relevant| / |relevant| (0 if |relevant|==0). "
+            "HitRate = 1 if intersection non-empty else 0 (0 if |relevant|==0). "
+            "MRR = 1/rank_of_first_relevant (unique record rank, 0 if none or |relevant|==0). "
+            "Zero-relevant queries return 0 for all metrics. Duplicate retrieved/ground-truth IDs deduplicated via set. "
             "No retrieval, embedding, or LLM calls were performed."
         ),
         "k_values": k_values,
         "config_ids": config_ids,
         "metric_definitions": {
-            "hit_rate": "Proportion of queries where ground truth record appears in top-k",
-            "precision": "Proportion of retrieved chunks in top-k that are relevant",
-            "recall": "Proportion of all relevant chunks that were retrieved in top-k",
-            "mrr": "Mean Reciprocal Rank: average of 1/rank_of_first_relevant across queries",
+            "hit_rate": "1 if at least one relevant record in top-k else 0 (0 if no relevant records)",
+            "precision": "Unique relevant retrieved records / k (k capped at actual retrieved length if K > index size; 0 if no relevant records)",
+            "recall": "Unique relevant retrieved records / total relevant records (0 if no relevant records)",
+            "mrr": "1/rank of first relevant record (unique record order, 0 if none or no relevant records)",
         },
         "per_query": per_query,
         "aggregated": aggregated,
@@ -251,7 +287,11 @@ def _load_retrieval_results() -> dict:
 
 def save_metrics(metrics: dict, path=None) -> Path:
     if path is None:
-        path = METRICS_PATH
+        version = metrics.get("version", METRICS_VERSION)
+        if version == METRICS_VERSION_V2:
+            path = METRICS_PATH_V2
+        else:
+            path = METRICS_PATH
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -272,8 +312,8 @@ def load_metrics(path=None) -> dict:
 def validate(metrics: dict) -> List[str]:
     issues = []
 
-    if metrics["version"] != METRICS_VERSION:
-        issues.append(f"FAIL: Expected version {METRICS_VERSION}, got {metrics['version']}")
+    version = metrics.get("version", METRICS_VERSION)
+    expected_k = K_VALUES_V2 if version == METRICS_VERSION_V2 else K_VALUES
 
     config_ids = metrics.get("config_ids", [])
     expected_configs = {"baseline_a", "baseline_b", "secure_rag"}
@@ -281,8 +321,8 @@ def validate(metrics: dict) -> List[str]:
         issues.append(f"FAIL: Config mismatch. Expected {expected_configs}, got {set(config_ids)}")
 
     k_values = metrics.get("k_values", [])
-    if set(k_values) != set(K_VALUES):
-        issues.append(f"FAIL: K values mismatch. Expected {K_VALUES}, got {k_values}")
+    if set(k_values) != set(expected_k):
+        issues.append(f"FAIL: K values mismatch. Expected {expected_k}, got {k_values}")
 
     per_query = metrics.get("per_query", {})
     if not per_query:
@@ -358,7 +398,7 @@ def print_summary(metrics: dict):
         )
         print(f"    {label:<35} k={k_val}  {degs}")
 
-    print(f"\n  Output:           {METRICS_PATH}")
+    print(f"\n  Output:           {METRICS_PATH if metrics.get('version')=='v1' else METRICS_PATH_V2}")
     print("=" * 60)
 
 

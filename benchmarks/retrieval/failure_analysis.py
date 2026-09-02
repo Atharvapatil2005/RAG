@@ -18,6 +18,33 @@ Taxonomy (from Phase 1 design):
     Entity Name Masked | Location Masked | Identifier Masked
   Embedding Similarity Failure
     Vocabulary Mismatch | Domain Drift
+
+AUDIT — Multi-record (v2) implications (P0 STEP 4):
+  Single-record assumption: one query -> one relevant record, binary hit@k.
+
+  1. entity_retrieval_failure / embedding_similarity_failure:
+     Current: binary hit_rate@10 ==0 => failure. For multi-record, a query may
+     retrieve 6/17 relevant records (recall 0.35) and still be classified as
+     "succeeded" by hit_rate==1, hiding partial failure. Conversely recall<1
+     is now the key signal. Future taxonomy should add:
+       - partial_retrieval_failure (0 < recall < 1)
+       - complete_miss (recall==0) vs incomplete_coverage
+       - separate categories per expected_behaviour multi_record_retrieval
+
+  2. masking_degradation:
+     Current: baseline_a hit@10==1 and secure_rag hit@10==0 => masking_degradation.
+     Under multi-record this binary comparison misses graded degradation:
+     e.g., baseline recall@50=0.8 vs secure recall@50=0.4. Future should compare
+     recall@k deltas and precision, not just hit_rate.
+
+  3. ranking_failure handling assumes single ground truth rank. With N relevant,
+     need to consider distribution of ranks (MRR, median rank, coverage curve).
+     Current gt_ranks = [rank where record_id in gt_records] is already multi-aware
+     but threshold check (min_rank >=10) is insufficient.
+
+  No taxonomy redesign implemented in STEP 4; this audit documents required changes
+  for P0 STEP 5. Metrics to run remain record-level set-based; failure_analysis
+  continues to classify via hit_rate@10 for backward compat.
 """
 
 import json
