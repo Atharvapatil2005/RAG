@@ -107,7 +107,7 @@ Verified end-to-end:
 
 ## Validation
 
-`data/validation_report.md` reports:
+`reports/dataset/validation_report.md` reports:
 - total patients / unique diseases / unique treatments
 - disease and treatment frequency distributions
 - average diagnoses (1.77) and treatments (3.46) per patient
@@ -115,4 +115,4 @@ Verified end-to-end:
 - deterministic regeneration check (passes)
 - pipeline compatibility smoke test (passes)
 
-`data/distribution_statistics.md` reports the full distributions.
+`reports/dataset/distribution_statistics.md` reports the full distributions.

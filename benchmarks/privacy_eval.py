@@ -21,7 +21,7 @@ from typing import Dict, List, Tuple
 from secure_rag.masker import mask_text
 from secure_rag.embedding import embed_chunks
 
-from _common import (
+from benchmarks._common import (
     BENCHMARK_DIR,
     DATASET_PATH,
     QUERIES_PATH,
@@ -31,15 +31,15 @@ from _common import (
     RETRIEVAL_K,
     MAX_LLM_FAILURE_RATE,
     LLM_RETRIES,
-    normalize,
-    loose_match,
-    pii_leaks,
-    load_records,
-    load_queries,
-    load_split,
+    benchmark_answer,
     build_index,
     EVALUATION_CONFIGS,
-    benchmark_answer,
+    load_queries,
+    load_records,
+    load_split,
+    loose_match,
+    normalize,
+    pii_leaks,
 )
 
 

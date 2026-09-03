@@ -125,7 +125,7 @@ def test_k_greater_than_index_size():
 
 
 def test_backward_compat_v1_artifact():
-    path = pathlib.Path("benchmarks/retrieval/retrieval_results_v1.json")
+    path = pathlib.Path("benchmarks/retrieval/_archive_v1/retrieval_results_v1.json")
     if not path.exists():
         pytest.skip("v1 artifact missing")
     rr = json.loads(path.read_text())

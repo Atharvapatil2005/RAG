@@ -12,26 +12,20 @@ Design:
 - Categories derived from query type (general vs PHI-targeting)
 - Expected retrieval behaviour records the anticipated challenge level
 
-Ground truth is versioned (v1) to allow future evolution.
+Ground truth is versioned (v2 canonical) to allow future evolution.
 """
 
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 RETRIEVAL_DIR = Path(__file__).parent
 BENCHMARK_DIR = RETRIEVAL_DIR.parent
 
-sys.path.insert(0, str(BENCHMARK_DIR.parent))
-
-GROUND_TRUTH_VERSION = "v1"
+GROUND_TRUTH_VERSION = "v2"
 GROUND_TRUTH_PATH = RETRIEVAL_DIR / f"ground_truth_{GROUND_TRUTH_VERSION}.json"
 DEFAULT_GROUND_TRUTH_PATH = GROUND_TRUTH_PATH
-
-GROUND_TRUTH_VERSION_V2 = "v2"
-GROUND_TRUTH_PATH_V2 = RETRIEVAL_DIR / f"ground_truth_{GROUND_TRUTH_VERSION_V2}.json"
 
 DATASET_PATH = BENCHMARK_DIR / "dataset.jsonl"
 QUERIES_PATH = BENCHMARK_DIR / "dataset_queries.json"
@@ -160,7 +154,7 @@ def generate_ground_truth() -> dict:
             })
 
     ground_truth = {
-        "version": GROUND_TRUTH_VERSION,
+        "version": "v1",
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "description": (
             "Ground truth for Secure RAG retrieval evaluation. "
@@ -210,7 +204,7 @@ def generate_ground_truth_v2() -> dict:
     for agg in AGGREGATE_QUERIES_V2:
         entries.append(dict(agg))
     ground_truth = {
-        "version": GROUND_TRUTH_VERSION_V2,
+        "version": GROUND_TRUTH_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "description": (
             "Ground truth v2 for Secure RAG retrieval evaluation. "
@@ -255,7 +249,7 @@ def compute_statistics(ground_truth: dict, records: dict = None, record_ids: set
     version = ground_truth.get("version", GROUND_TRUTH_VERSION)
 
     if records is None:
-        if version == GROUND_TRUTH_VERSION_V2:
+        if version == GROUND_TRUTH_VERSION:
             try:
                 records = _load_mrn_records_raw()
             except Exception:
@@ -311,7 +305,7 @@ def compute_statistics(ground_truth: dict, records: dict = None, record_ids: set
 
     known_behaviours_v1 = {"record_retrieval", "entity_retrieval"}
     known_behaviours_v2 = {"record_retrieval", "entity_retrieval", "multi_record_retrieval"}
-    allowed = known_behaviours_v2 if version == GROUND_TRUTH_VERSION_V2 else known_behaviours_v1
+    allowed = known_behaviours_v2 if version == GROUND_TRUTH_VERSION else known_behaviours_v1
 
     return {
         "version": ground_truth["version"],
@@ -350,7 +344,7 @@ def validate_ground_truth(ground_truth: dict = None) -> List[str]:
 
     issues = []
     version = ground_truth.get("version", GROUND_TRUTH_VERSION)
-    if version == GROUND_TRUTH_VERSION_V2:
+    if version == GROUND_TRUTH_VERSION:
         try:
             records = _load_mrn_records_raw()
         except Exception:
@@ -364,7 +358,7 @@ def validate_ground_truth(ground_truth: dict = None) -> List[str]:
         issues.append("FAIL: No queries in ground truth.")
 
     known_categories = {"general", "phi_targeting"}
-    if version == GROUND_TRUTH_VERSION_V2:
+    if version == GROUND_TRUTH_VERSION:
         known_behaviours = {"record_retrieval", "entity_retrieval", "multi_record_retrieval"}
     else:
         known_behaviours = {"record_retrieval", "entity_retrieval"}
@@ -390,7 +384,7 @@ def validate_ground_truth(ground_truth: dict = None) -> List[str]:
 
         subcat = entry.get("subcategory")
         if subcat not in QID_TO_SUBCATEGORY.values() and subcat != "unknown":
-            if version == GROUND_TRUTH_VERSION_V2 and subcat not in ("factual_hospital", "summary", "phi_aadhaar", "phi_phone", "phi_mrn", "unknown"):
+            if version == GROUND_TRUTH_VERSION and subcat not in ("factual_hospital", "summary", "phi_aadhaar", "phi_phone", "phi_mrn", "unknown"):
                 issues.append(f"FAIL: {qid} has invalid subcategory: {subcat}")
 
         rel = entry.get("relevant_records", None)
@@ -400,7 +394,7 @@ def validate_ground_truth(ground_truth: dict = None) -> List[str]:
         if not isinstance(rel, list):
             issues.append(f"FAIL: {qid} relevant_records is not a list.")
             continue
-        if version == GROUND_TRUTH_VERSION:
+        if version == "v1":
             if not rel:
                 issues.append(f"FAIL: {qid} has no relevant records.")
         if len(rel) != len(set(rel)):
@@ -467,7 +461,7 @@ def format_validation(issues: List[str]) -> str:
 
 if __name__ == "__main__":
     print("Generating ground truth...")
-    gt = generate_ground_truth()
+    gt = generate_ground_truth_v2()
 
     path = save_ground_truth(gt)
     print(f"Saved to: {path}")
