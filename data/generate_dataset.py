@@ -43,9 +43,10 @@ from faker import Faker
 SEED = 42
 NUM_PATIENTS = 120
 BASE_DIR = Path(__file__).parent
+PROJECT_DIR = BASE_DIR.parent
 OUTPUT_PATH = BASE_DIR / "sample_patient_data.txt"
-REPORT_PATH = BASE_DIR / "validation_report.md"
-DISTRIBUTION_PATH = BASE_DIR / "distribution_statistics.md"
+REPORT_PATH = PROJECT_DIR / "reports" / "dataset" / "validation_report.md"
+DISTRIBUTION_PATH = PROJECT_DIR / "reports" / "dataset" / "distribution_statistics.md"
 
 fake = Faker("en_IN")
 

@@ -6,7 +6,8 @@
 - Skip spaCy-dependent tests: `python3 -m pytest tests/ -m "not slow"`
 - Run one test: `python3 -m pytest tests/test_masker.py::TestNERMasking::test_person_name_masked`
 - Run privacy evaluation: `python3 benchmarks/privacy_eval.py`
-- Regenerate benchmark dataset: `python3 benchmarks/generate_dataset.py`
+- Regenerate canonical MRN dataset: `python3 data/generate_dataset.py`
+- Regenerate legacy privacy benchmark dataset (compatibility): `python3 benchmarks/generate_dataset.py`
 - Build package: `python3 -m build`
 
 ## Setup Gotchas

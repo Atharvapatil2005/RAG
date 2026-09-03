@@ -1,23 +1,16 @@
 import json
 import math
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 RETRIEVAL_DIR = Path(__file__).parent
 BENCHMARK_DIR = RETRIEVAL_DIR.parent
-sys.path.insert(0, str(BENCHMARK_DIR))
-METRICS_VERSION = "v1"
-METRICS_VERSION_V2 = "v2"
-METRICS_FRAMEWORK_VERSION = "1"
-METRICS_FRAMEWORK_VERSION_V2 = "2"
+METRICS_VERSION = "v2"
+METRICS_FRAMEWORK_VERSION = "2"
 METRICS_PATH = RETRIEVAL_DIR / f"metrics_{METRICS_VERSION}.json"
-METRICS_PATH_V2 = RETRIEVAL_DIR / f"metrics_{METRICS_VERSION_V2}.json"
 
-K_VALUES = [1, 3, 5, 10]
-K_VALUES_V1 = [1, 3, 5, 10]
-K_VALUES_V2 = [1, 3, 5, 10, 20, 30, 50]
+K_VALUES = [1, 3, 5, 10, 20, 30, 50]
 METRIC_NAMES = ["hit_rate", "precision", "recall", "mrr"]
 
 
@@ -243,8 +236,8 @@ def compute_metrics(retrieval_results: dict = None, version: str = None) -> dict
 
     inferred_version = retrieval_results.get("version", METRICS_VERSION)
     if version is None:
-        version = inferred_version if inferred_version in (METRICS_VERSION, METRICS_VERSION_V2) else METRICS_VERSION
-    framework_version = METRICS_FRAMEWORK_VERSION_V2 if version == METRICS_VERSION_V2 else METRICS_FRAMEWORK_VERSION
+        version = inferred_version if inferred_version in ("v1", "v2") else METRICS_VERSION
+    framework_version = "1" if version == "v1" else METRICS_FRAMEWORK_VERSION
     source_artifact = f"retrieval_results_{version}.json"
 
     metrics = {
@@ -281,17 +274,14 @@ def compute_metrics(retrieval_results: dict = None, version: str = None) -> dict
 
 
 def _load_retrieval_results() -> dict:
-    from retrieval.runner import load_results as load_retrieval_results
+    from benchmarks.retrieval.runner import load_results as load_retrieval_results
+
     return load_retrieval_results()
 
 
 def save_metrics(metrics: dict, path=None) -> Path:
     if path is None:
-        version = metrics.get("version", METRICS_VERSION)
-        if version == METRICS_VERSION_V2:
-            path = METRICS_PATH_V2
-        else:
-            path = METRICS_PATH
+        path = METRICS_PATH
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -301,10 +291,13 @@ def save_metrics(metrics: dict, path=None) -> Path:
 
 def load_metrics(path=None) -> dict:
     if path is None:
-        configs = sorted(METRICS_PATH.parent.glob("metrics_*.json"))
-        if not configs:
-            raise FileNotFoundError("No metrics file found.")
-        path = configs[-1]
+        if METRICS_PATH.exists():
+            path = METRICS_PATH
+        else:
+            configs = sorted(METRICS_PATH.parent.glob("metrics_*.json"))
+            if not configs:
+                raise FileNotFoundError("No metrics file found.")
+            path = configs[-1]
     with open(path) as f:
         return json.load(f)
 
@@ -313,7 +306,7 @@ def validate(metrics: dict) -> List[str]:
     issues = []
 
     version = metrics.get("version", METRICS_VERSION)
-    expected_k = K_VALUES_V2 if version == METRICS_VERSION_V2 else K_VALUES
+    expected_k = [1, 3, 5, 10] if version == "v1" else K_VALUES
 
     config_ids = metrics.get("config_ids", [])
     expected_configs = {"baseline_a", "baseline_b", "secure_rag"}
@@ -398,7 +391,7 @@ def print_summary(metrics: dict):
         )
         print(f"    {label:<35} k={k_val}  {degs}")
 
-    print(f"\n  Output:           {METRICS_PATH if metrics.get('version')=='v1' else METRICS_PATH_V2}")
+    print(f"\n  Output:           {METRICS_PATH}")
     print("=" * 60)
 
 

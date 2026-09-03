@@ -1,3 +1,16 @@
+"""
+Legacy benchmark dataset generator (MEDxxx / Faker).
+
+This module generates the legacy privacy benchmark dataset
+(`benchmarks/dataset.jsonl`, `benchmarks/dataset_queries.json`,
+`benchmarks/train_test_split.json`) used by `benchmarks/privacy_eval.py`.
+
+It is retained for legacy privacy evaluation compatibility only.
+The canonical research dataset for retrieval is `data/generate_dataset.py`
+(MRN medical dataset, 120 records, domain-aware, deterministic).
+Do not mix the two schemas.
+"""
+
 import json
 import random
 from pathlib import Path

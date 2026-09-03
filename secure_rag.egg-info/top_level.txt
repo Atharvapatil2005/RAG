@@ -1,6 +1,0 @@
-benchmarks
-dist
-docs
-secure_rag
-tests
-venv

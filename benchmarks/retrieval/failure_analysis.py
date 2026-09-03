@@ -1,7 +1,7 @@
 """
 Retrieval Failure Analysis — Secure RAG retrieval evaluation.
 
-Consumes metrics_v1.json + retrieval_results_v1.json to explain WHY
+Consumes metrics_v2.json + retrieval_results_v2.json to explain WHY
 retrieval succeeds or fails for each query. No retrieval occurs.
 No metrics are recomputed.
 
@@ -48,21 +48,16 @@ AUDIT — Multi-record (v2) implications (P0 STEP 4):
 """
 
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 RETRIEVAL_DIR = Path(__file__).parent
 BENCHMARK_DIR = RETRIEVAL_DIR.parent
-sys.path.insert(0, str(BENCHMARK_DIR))
 
-FAILURE_ANALYSIS_VERSION = "v1"
-FAILURE_ANALYSIS_FRAMEWORK_VERSION = "1"
+FAILURE_ANALYSIS_VERSION = "v2"
+FAILURE_ANALYSIS_FRAMEWORK_VERSION = "2"
 FAILURE_ANALYSIS_PATH = RETRIEVAL_DIR / f"failure_analysis_{FAILURE_ANALYSIS_VERSION}.json"
-FAILURE_ANALYSIS_VERSION_V2 = "v2"
-FAILURE_ANALYSIS_FRAMEWORK_VERSION_V2 = "2"
-FAILURE_ANALYSIS_PATH_V2 = RETRIEVAL_DIR / f"failure_analysis_{FAILURE_ANALYSIS_VERSION_V2}.json"
 
 RECALL_TIER_COMPLETE = "complete_retrieval"
 RECALL_TIER_PARTIAL = "partial_retrieval"
@@ -95,12 +90,14 @@ SUBCATEGORY_TO_TAXONOMY = {
 
 
 def load_retrieval_results() -> dict:
-    from retrieval.runner import load_results
+    from benchmarks.retrieval.runner import load_results
+
     return load_results()
 
 
 def load_metrics() -> dict:
-    from retrieval.metrics import load_metrics
+    from benchmarks.retrieval.metrics import load_metrics
+
     return load_metrics()
 
 
@@ -276,7 +273,7 @@ def run_failure_analysis(metrics: dict = None, retrieval_results: dict = None, v
 
     inferred_version = metrics.get("version", FAILURE_ANALYSIS_VERSION)
     if version is None:
-        version = inferred_version if inferred_version in (FAILURE_ANALYSIS_VERSION, FAILURE_ANALYSIS_VERSION_V2) else FAILURE_ANALYSIS_VERSION
+        version = inferred_version if inferred_version in ("v1", "v2") else FAILURE_ANALYSIS_VERSION
 
     per_query_metrics = metrics["per_query"]
     retrieval_by_qid = {q["qid"]: q for q in retrieval_results["queries"]}
@@ -338,8 +335,7 @@ def run_failure_analysis(metrics: dict = None, retrieval_results: dict = None, v
 
     total_failures = sum(1 for a in analyses.values() if a["overall_failed"])
 
-    is_v2 = version == FAILURE_ANALYSIS_VERSION_V2
-    framework_version = FAILURE_ANALYSIS_FRAMEWORK_VERSION_V2 if is_v2 else FAILURE_ANALYSIS_FRAMEWORK_VERSION
+    framework_version = FAILURE_ANALYSIS_FRAMEWORK_VERSION
     src_metrics = f"metrics_{version}.json"
     src_results = f"retrieval_results_{version}.json"
 
@@ -349,13 +345,10 @@ def run_failure_analysis(metrics: dict = None, retrieval_results: dict = None, v
         "ranking_failure": "Correct record retrieved but ranked below k threshold",
         "masking_degradation": "Pre-embedding masking caused retrieval failure in Secure RAG",
         "embedding_similarity_failure": "Semantic mismatch between query and record embeddings",
+        RECALL_TIER_COMPLETE: "All relevant records retrieved (recall == 1.0)",
+        RECALL_TIER_PARTIAL: "Some but not all relevant records retrieved (0 < recall < 1.0)",
+        RECALL_TIER_ZERO: "No relevant records retrieved (recall == 0.0)",
     }
-    if is_v2:
-        taxonomy.update({
-            RECALL_TIER_COMPLETE: "All relevant records retrieved (recall == 1.0)",
-            RECALL_TIER_PARTIAL: "Some but not all relevant records retrieved (0 < recall < 1.0)",
-            RECALL_TIER_ZERO: "No relevant records retrieved (recall == 0.0)",
-        })
 
     statistics = {
         "total_queries": len(analyses),
@@ -365,32 +358,28 @@ def run_failure_analysis(metrics: dict = None, retrieval_results: dict = None, v
         "failure_by_subcategory": dict(sorted(subcategory_counts.items())),
         "per_config": per_config_summary,
     }
-    if is_v2:
-        multi_total = sum(1 for a in analyses.values() if a.get("is_multi_record"))
-        single_total = sum(1 for a in analyses.values() if a.get("is_single_record"))
-        statistics.update({
-            "recall_tiers_overall": dict(sorted(recall_tier_counts.items())),
-            "recall_tiers_multi_record": dict(sorted(multi_recall_tier_counts.items())),
-            "recall_tiers_single_record": dict(sorted(single_recall_tier_counts.items())),
-            "multi_record_queries": multi_total,
-            "single_record_queries": single_total,
-            "recall_tier_definition": {
-                RECALL_TIER_COMPLETE: "recall == 1.0",
-                RECALL_TIER_PARTIAL: "0 < recall < 1.0",
-                RECALL_TIER_ZERO: "recall == 0.0",
-            },
-        })
+    multi_total = sum(1 for a in analyses.values() if a.get("is_multi_record"))
+    single_total = sum(1 for a in analyses.values() if a.get("is_single_record"))
+    statistics.update({
+        "recall_tiers_overall": dict(sorted(recall_tier_counts.items())),
+        "recall_tiers_multi_record": dict(sorted(multi_recall_tier_counts.items())),
+        "recall_tiers_single_record": dict(sorted(single_recall_tier_counts.items())),
+        "multi_record_queries": multi_total,
+        "single_record_queries": single_total,
+        "recall_tier_definition": {
+            RECALL_TIER_COMPLETE: "recall == 1.0",
+            RECALL_TIER_PARTIAL: "0 < recall < 1.0",
+            RECALL_TIER_ZERO: "recall == 0.0",
+        },
+    })
 
     description = (
         "Canonical failure analysis artifact for Secure RAG retrieval evaluation. "
         "Classifies retrieval failures using the approved taxonomy. "
         "Each failure includes category, specific type, supporting evidence, and rationale."
+        " v2 adds recall-aware tiers (complete/partial/zero) computed from recall = retrieved_relevant / total_relevant at k=10. "
+        "Single-record queries retain binary recall 0/1 semantics. Multi-record queries are classified by coverage."
     )
-    if is_v2:
-        description += (
-            " v2 adds recall-aware tiers (complete/partial/zero) computed from recall = retrieved_relevant / total_relevant at k=10. "
-            "Single-record queries retain binary recall 0/1 semantics. Multi-record queries are classified by coverage."
-        )
 
     result = {
         "version": version,
@@ -411,11 +400,7 @@ def run_failure_analysis(metrics: dict = None, retrieval_results: dict = None, v
 
 def save_failure_analysis(analysis: dict, path=None) -> Path:
     if path is None:
-        version = analysis.get("version", FAILURE_ANALYSIS_VERSION)
-        if version == FAILURE_ANALYSIS_VERSION_V2:
-            path = FAILURE_ANALYSIS_PATH_V2
-        else:
-            path = FAILURE_ANALYSIS_PATH
+        path = FAILURE_ANALYSIS_PATH
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -425,10 +410,13 @@ def save_failure_analysis(analysis: dict, path=None) -> Path:
 
 def load_failure_analysis(path=None) -> dict:
     if path is None:
-        configs = sorted(FAILURE_ANALYSIS_PATH.parent.glob("failure_analysis_*.json"))
-        if not configs:
-            raise FileNotFoundError("No failure analysis file found.")
-        path = configs[-1]
+        if FAILURE_ANALYSIS_PATH.exists():
+            path = FAILURE_ANALYSIS_PATH
+        else:
+            configs = sorted(FAILURE_ANALYSIS_PATH.parent.glob("failure_analysis_*.json"))
+            if not configs:
+                raise FileNotFoundError("No failure analysis file found.")
+            path = configs[-1]
     with open(path) as f:
         return json.load(f)
 
@@ -436,7 +424,7 @@ def load_failure_analysis(path=None) -> dict:
 def validate(analysis: dict) -> List[str]:
     issues = []
 
-    if analysis["version"] not in (FAILURE_ANALYSIS_VERSION, FAILURE_ANALYSIS_VERSION_V2):
+    if analysis["version"] not in ("v1", "v2"):
         issues.append(f"FAIL: Expected version v1 or v2, got {analysis['version']}")
 
     per_query = analysis.get("per_query", {})
@@ -490,7 +478,7 @@ def validate(analysis: dict) -> List[str]:
 def print_summary(analysis: dict):
     stats = analysis["statistics"]
     version = analysis.get("version", "unknown")
-    out_path = FAILURE_ANALYSIS_PATH_V2 if version == FAILURE_ANALYSIS_VERSION_V2 else FAILURE_ANALYSIS_PATH
+    out_path = FAILURE_ANALYSIS_PATH
     print("\n" + "=" * 60)
     print(f"FAILURE ANALYSIS — SUMMARY (v{version})")
     print("=" * 60)

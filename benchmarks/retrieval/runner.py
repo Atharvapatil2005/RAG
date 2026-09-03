@@ -1,41 +1,29 @@
 import json
 import random
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-RETRIEVAL_DIR = Path(__file__).parent
-BENCHMARK_DIR = RETRIEVAL_DIR.parent
-PROJECT_DIR = BENCHMARK_DIR.parent
-
-sys.path.insert(0, str(PROJECT_DIR))
-
 import numpy as np
 
+from benchmarks._common import EVALUATION_CONFIGS
+from benchmarks.retrieval.ground_truth import GROUND_TRUTH_PATH
 from secure_rag.detection import load_detector_stack
+from secure_rag.embedding import embed_chunks
 from secure_rag.masker import mask_text
 from secure_rag.pdf_loader import chunk_text
-from secure_rag.embedding import embed_chunks
 from secure_rag.policies import load_policy
 from secure_rag.vector_store import VectorStore
 
-sys.path.insert(0, str(BENCHMARK_DIR))
-from _common import load_records, load_queries, load_split, EVALUATION_CONFIGS
-from retrieval.ground_truth import load_ground_truth
+RETRIEVAL_DIR = Path(__file__).parent
+BENCHMARK_DIR = RETRIEVAL_DIR.parent
 
 RUNNER_VERSION = "3"
-RETRIEVAL_RESULTS_VERSION = "v1"
-RETRIEVAL_RESULTS_VERSION_V2 = "v2"
-MAX_K = 10
-MAX_K_V1 = 10
-MAX_K_V2 = 50
-K_VALUES = [1, 3, 5, 10]
-K_VALUES_V1 = [1, 3, 5, 10]
-K_VALUES_V2 = [1, 3, 5, 10, 20, 30, 50]
+RETRIEVAL_RESULTS_VERSION = "v2"
+MAX_K = 50
+K_VALUES = [1, 3, 5, 10, 20, 30, 50]
 RETRIEVAL_RESULTS_PATH = RETRIEVAL_DIR / f"retrieval_results_{RETRIEVAL_RESULTS_VERSION}.json"
-RETRIEVAL_RESULTS_PATH_V2 = RETRIEVAL_DIR / f"retrieval_results_{RETRIEVAL_RESULTS_VERSION_V2}.json"
 
 
 def _build_index_with_record_map(
@@ -80,19 +68,20 @@ def _retrieve_top_k(
     return indices_list, distances_list
 
 
-def run_retrieval(version: str = "v1") -> dict:
+def run_retrieval(version: str = "v2") -> dict:
     print("=" * 60)
     print("Retrieval Runner — Secure RAG Retrieval Evaluation")
     print("=" * 60)
 
-    retrieval_version = RETRIEVAL_RESULTS_VERSION_V2 if version == "v2" else RETRIEVAL_RESULTS_VERSION
-    max_k = MAX_K_V2 if version == "v2" else MAX_K
-    k_values = K_VALUES_V2 if version == "v2" else K_VALUES
+    retrieval_version = RETRIEVAL_RESULTS_VERSION
+    max_k = MAX_K
+    k_values = K_VALUES
 
     if version == "v2":
-        from retrieval.ground_truth import _load_mrn_records_raw, GROUND_TRUTH_PATH_V2
+        from benchmarks.retrieval.ground_truth import _load_mrn_records_raw
+
         mrn_records = _load_mrn_records_raw()
-        with open(GROUND_TRUTH_PATH_V2) as f:
+        with open(GROUND_TRUTH_PATH) as f:
             ground_truth = json.load(f)
         test_records = mrn_records
         print(f"\nLoaded {len(mrn_records)} MRN records (v2 full dataset)")
@@ -109,16 +98,13 @@ def run_retrieval(version: str = "v1") -> dict:
             })
         combined.sort(key=lambda x: x["qid"])
     else:
+        from benchmarks._common import load_records, load_queries, load_split
+        from benchmarks.retrieval.ground_truth import load_ground_truth
+
         records = load_records()
         queries_data = load_queries()
         split = load_split()
         ground_truth = load_ground_truth()
-        if ground_truth.get("version") == "v2":
-            from pathlib import Path as _P
-            gt_v1_path = RETRIEVAL_DIR / "ground_truth_v1.json"
-            if _P(gt_v1_path).exists():
-                with open(gt_v1_path) as f:
-                    ground_truth = json.load(f)
         test_ids = split["test"]
         test_records = {rid: records[rid] for rid in test_ids if rid in records}
         print(f"\nLoaded {len(records)} records, {len(test_ids)} test records")
@@ -271,11 +257,7 @@ def run_retrieval(version: str = "v1") -> dict:
 
 def save_results(results: dict, path=None) -> Path:
     if path is None:
-        version = results.get("version", RETRIEVAL_RESULTS_VERSION)
-        if version == RETRIEVAL_RESULTS_VERSION_V2:
-            path = RETRIEVAL_RESULTS_PATH_V2
-        else:
-            path = RETRIEVAL_RESULTS_PATH
+        path = RETRIEVAL_RESULTS_PATH
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -286,13 +268,14 @@ def save_results(results: dict, path=None) -> Path:
 def load_results(path=None, version: str = None) -> dict:
     if path is None:
         if version is not None:
-            target = RETRIEVAL_RESULTS_PATH_V2 if version == "v2" else RETRIEVAL_RESULTS_PATH
-            path = target
+            path = RETRIEVAL_DIR / f"retrieval_results_{version}.json"
         else:
-            configs = sorted(RETRIEVAL_RESULTS_PATH.parent.glob("retrieval_results_*.json"))
-            if not configs:
-                raise FileNotFoundError("No retrieval results file found.")
-            path = configs[-1]
+            path = RETRIEVAL_RESULTS_PATH
+            if not path.exists():
+                configs = sorted(RETRIEVAL_RESULTS_PATH.parent.glob("retrieval_results_*.json"))
+                if not configs:
+                    raise FileNotFoundError("No retrieval results file found.")
+                path = configs[-1]
     with open(path) as f:
         return json.load(f)
 
@@ -318,7 +301,7 @@ def print_summary(results: dict):
         print(f"    {cid:<15} {meta['index_type']:<10} {meta['num_chunks']:>4} chunks, "
               f"{meta['num_records']:>2} records  ({meta['build_time_s']:.2f}s)")
 
-    out_path = RETRIEVAL_RESULTS_PATH_V2 if results.get("version") == RETRIEVAL_RESULTS_VERSION_V2 else RETRIEVAL_RESULTS_PATH
+    out_path = RETRIEVAL_RESULTS_PATH
     print(f"\n  Output:           {out_path}")
     print(f"\n  Total results stored: {len(results['queries'])} query entries")
     print("\n" + "=" * 60)
@@ -328,9 +311,9 @@ def validate(results: dict) -> List[str]:
     issues = []
 
     version = results.get("version", RETRIEVAL_RESULTS_VERSION)
-    expected_max_k = MAX_K_V2 if version == RETRIEVAL_RESULTS_VERSION_V2 else MAX_K
+    expected_max_k = 10 if version == "v1" else MAX_K
 
-    if version not in (RETRIEVAL_RESULTS_VERSION, RETRIEVAL_RESULTS_VERSION_V2):
+    if version not in ("v1", "v2"):
         issues.append(f"FAIL: Expected version v1 or v2, got {results['version']}")
 
     if not results["queries"]:
@@ -394,7 +377,7 @@ def validate(results: dict) -> List[str]:
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="v1", choices=["v1", "v2"])
+    parser.add_argument("--version", default="v2", choices=["v1", "v2"])
     args = parser.parse_args()
 
     print(f"Retrieval Runner — Phase 3 (version={args.version})")

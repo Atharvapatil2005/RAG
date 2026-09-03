@@ -1,6 +1,21 @@
 .env
 venv/
 __pycache__/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+benchmarks/dataset.jsonl
+benchmarks/dataset_queries.json
+benchmarks/train_test_split.json
+benchmarks/results.json
+benchmarks/retrieval/*.json
+benchmarks/retrieval/*.md
+!benchmarks/retrieval/_archive_v1/
+!benchmarks/retrieval/_archive_v1/*.json
+data/sample_patient_data.txt
 
 rag_features_checklist.md
 REFACTOR_CHECKLIST.md

@@ -1,18 +1,16 @@
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
+from benchmarks.retrieval.metrics import hit_rate_at_k, mrr_at_k, precision_at_k, recall_at_k
+
 RETRIEVAL_DIR = Path(__file__).parent
 BENCHMARK_DIR = RETRIEVAL_DIR.parent
-sys.path.insert(0, str(BENCHMARK_DIR))
-
-from retrieval.metrics import hit_rate_at_k, precision_at_k, recall_at_k, mrr_at_k
-
+PROJECT_DIR = BENCHMARK_DIR.parent
 DEPTH_VERSION = "v2"
 DEPTH_PATH = RETRIEVAL_DIR / f"depth_experiment_{DEPTH_VERSION}.json"
-REPORT_PATH = RETRIEVAL_DIR / f"depth_report_{DEPTH_VERSION}.md"
+REPORT_PATH = PROJECT_DIR / "reports" / "retrieval" / "dense" / "depth_report.md"
 
 K_CANDIDATES = [2, 5, 10, 20, 30, 50]
 AGG_QUERIES = [
@@ -24,7 +22,8 @@ AGG_QUERIES = [
 ]
 
 def load_retrieval_results():
-    from retrieval.runner import load_results
+    from benchmarks.retrieval.runner import load_results
+
     return load_results(version="v2")
 
 def compute_depth_metrics():

@@ -4,8 +4,8 @@ import pathlib
 import pytest
 
 from benchmarks.retrieval.ground_truth import (
-    GROUND_TRUTH_PATH_V2,
-    GROUND_TRUTH_VERSION_V2,
+    GROUND_TRUTH_PATH,
+    GROUND_TRUTH_VERSION,
     generate_ground_truth_v2,
     validate_ground_truth,
     compute_statistics,
@@ -15,15 +15,15 @@ from benchmarks.retrieval.ground_truth import (
 
 
 def _load_v2():
-    return json.loads(pathlib.Path(GROUND_TRUTH_PATH_V2).read_text())
+    return json.loads(pathlib.Path(GROUND_TRUTH_PATH).read_text())
 
 
 def test_v2_file_exists():
-    assert pathlib.Path(GROUND_TRUTH_PATH_V2).exists()
+    assert pathlib.Path(GROUND_TRUTH_PATH).exists()
 
 
 def test_v2_preserves_v1():
-    v1_path = pathlib.Path("benchmarks/retrieval/ground_truth_v1.json")
+    v1_path = pathlib.Path("benchmarks/retrieval/_archive_v1/ground_truth_v1.json")
     assert v1_path.exists()
     v1 = json.loads(v1_path.read_text())
     assert v1["version"] == "v1"
@@ -31,7 +31,7 @@ def test_v2_preserves_v1():
 
 def test_v2_version_and_schema():
     gt = _load_v2()
-    assert gt["version"] == GROUND_TRUTH_VERSION_V2
+    assert gt["version"] == GROUND_TRUTH_VERSION
     assert "relevant_records" in gt["schema"]
     assert "list[str]" in gt["schema"]["relevant_records"]
 
